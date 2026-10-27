@@ -86,12 +86,12 @@ function processOrders() {
     rows.forEach(row => {
         let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
         let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
-        let logistics = row[6] ? row[6].trim() : "";     // G 物流
-        let addressMemo = row[7] ? row[7].trim() : "";   // H 物流編號/地址
+        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：寄送方式（可能帶有 ➤ 備註）
         let itemName = row[8] ? row[8].trim() : "";      // I 商品名稱
         let quantity = row[9] ? row[9].trim() : "";      // J 數量
         let totalAmount = row[12] ? row[12].trim() : ""; // M 總金額
 
+        // 智慧尋找訂單編號
         if (!orderNo || orderNo.length < 5 || orderNo.includes('₫') || orderNo.includes('FALSE')) {
             row.forEach(cell => {
                 if (cell && cell.length >= 10 && /^[0-9A-Z]{10,20}$/.test(cell)) {
@@ -106,28 +106,31 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
-        if (!orders[currentOrderNo]) {
-            let memoText = "";
-            if (logistics.includes("➤")) {
-                let parts = logistics.split("➤");
-                logistics = parts[0].trim(); 
-                memoText = parts[1].trim();  
+        // 專門解析 G 欄：分離物流名稱與 ➤ 後方的備註
+        let logistics = logisticsRaw;
+        let foundMemo = "";
+        if (logisticsRaw.includes("➤")) {
+            let parts = logisticsRaw.split("➤");
+            logistics = parts[0].trim();
+            if (parts[1] && parts[1].trim() !== "") {
+                foundMemo = parts[1].trim();
             }
+        }
 
+        if (!orders[currentOrderNo]) {
             orders[currentOrderNo] = {
                 date: formattedDate,
                 orderNo: currentOrderNo,
                 contact: contact || "未命名",
                 logistics: logistics || "超商寄送",
-                addressMemo: addressMemo || "",
-                memo: memoText,
+                memo: foundMemo,
                 totalAmount: totalAmount || "0",
                 items: []
             };
         } else {
             if (!orders[currentOrderNo].contact && contact && contact !== "FALSE") orders[currentOrderNo].contact = contact;
-            if (!orders[currentOrderNo].logistics && logistics && logistics !== "FALSE") orders[currentOrderNo].logistics = logistics;
-            if (!orders[currentOrderNo].addressMemo && addressMemo && addressMemo !== "FALSE") orders[currentOrderNo].addressMemo = addressMemo;
+            if (!orders[currentOrderNo].logistics && logistics && logistics !== "FALSE" && logistics !== "") orders[currentOrderNo].logistics = logistics;
+            if (!orders[currentOrderNo].memo && foundMemo) orders[currentOrderNo].memo = foundMemo;
             if (!orders[currentOrderNo].totalAmount || orders[currentOrderNo].totalAmount === "0") {
                 if (totalAmount && !isNaN(totalAmount)) orders[currentOrderNo].totalAmount = totalAmount;
             }
@@ -158,7 +161,6 @@ function processOrders() {
     for (let key in orders) {
         let ord = orders[key];
 
-        // 主出貨單（粗線 14 格、細線 20 格、無數量改為 ➤）
         let mainReceipt = 
 `━━━━━━━━━━━━━━
 日期：${ord.date}
@@ -166,7 +168,7 @@ function processOrders() {
 姓名：${ord.contact}
 ━━━━━━━━━━━━━━
 寄送方式：${ord.logistics}
-物流碼：${ord.addressMemo}
+物流碼：${ord.logistics}
 --------------------\n`;
 
         ord.items.forEach(item => {
@@ -187,7 +189,7 @@ function processOrders() {
         generatedReceipts.push({ type: 'main', content: mainReceipt });
         previewHtml += mainReceipt + "\n\n================ [ 主單裁切處 ] ================\n\n";
 
-        // 小叮嚀卡片（粗線同樣維持 14 格，置中）
+        // 小叮嚀卡片
         let printedKeywords = new Set();
         ord.items.forEach(item => {
             memoRules.forEach(rule => {
