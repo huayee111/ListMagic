@@ -57,7 +57,6 @@ function processOrders() {
     }
 
     let textValue = rawText.value;
-    // 清洗儲存格內部的強制換行
     textValue = textValue.replace(/"([^"]*?)"/g, (match, p1) => {
         return '"' + p1.replace(/[\r\n]+/g, ' ') + '"';
     });
@@ -111,20 +110,24 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
-        // 🔥【智慧掃描物流與物流碼】主動避開下拉選單的 ← 符號，精準抓取真正的超商與物流碼
+        // 🔥【智慧掃描物流、物流碼與備註】嚴格檢查格式，防止備註文字跑到物流碼裡面
         let foundLogistics = "";
         let foundAddressMemo = "";
         let foundMemo = "";
 
         row.forEach(cell => {
             if (cell && cell !== "←" && !cell.startsWith("←")) {
-                // 抓取超商名稱
+                // 1. 抓取超商名稱
                 if (cell.includes("7-11") || cell.includes("全家") || cell.includes("蝦皮店到店") || cell.includes("萊爾富") || cell.includes("OK") || cell.includes("店到店")) {
                     if (cell.length > 15) {
                         let match = cell.match(/^(7-11|全家|蝦皮店到店|萊爾富|OK|店到店)(.*)$/);
                         if (match) {
                             foundLogistics = match[1];
-                            foundAddressMemo = match[2].trim();
+                            let candidateMemo = match[2].trim();
+                            // 如果後方帶有 TW 物流碼
+                            if (candidateMemo.startsWith("TW") || /^[A-Z0-9]{10,}$/.test(candidateMemo)) {
+                                foundAddressMemo = candidateMemo;
+                            }
                         } else {
                             foundAddressMemo = cell;
                         }
@@ -132,14 +135,14 @@ function processOrders() {
                         foundLogistics = cell;
                     }
                 } 
-                // 抓取物流碼 (通常以 TW 開頭或長度大於 10 的純編號)
-                else if (cell.startsWith("TW") || (/^[A-Z0-9]{10,}$/.test(cell) && !cell.includes("CD01") && !cell.includes("CG01"))) {
-                    if (!cell.includes("蝦皮") && !cell.includes("叮噹")) {
+                // 2. 嚴格抓取物流碼 (必須是 TW 開頭，或純英數字且不含中文與標點符號)
+                else if (cell.startsWith("TW") || (/^[A-Z0-9]{10,25}$/.test(cell) && !cell.includes("CD01") && !cell.includes("CG01"))) {
+                    if (!cell.includes("蝦皮") && !cell.includes("叮噹") && !cell.includes("統編")) {
                         foundAddressMemo = cell;
                     }
                 }
 
-                // 抓取 ➤ 備註
+                // 3. 抓取 ➤ 備註
                 if (cell.includes("➤")) {
                     let parts = cell.split("➤");
                     if (parts[1] && parts[1].trim() !== "") {
@@ -147,6 +150,13 @@ function processOrders() {
                         if (!foundMemo.includes(memoCandidate)) {
                             foundMemo = foundMemo ? foundMemo + " " + memoCandidate : memoCandidate;
                         }
+                    }
+                }
+
+                // 4. 【新增加】如果格子裡包含中文或備註性質的文字（例如統編、說明），自動轉入備註欄！
+                if (cell.length > 8 && (cell.includes("統編") || cell.includes("未稅") || cell.includes("客戶") || cell.includes("詢問") || cell.includes("打統編"))) {
+                    if (!foundMemo.includes(cell)) {
+                        foundMemo = foundMemo ? foundMemo + " " + cell : cell;
                     }
                 }
             }
