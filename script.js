@@ -265,9 +265,9 @@ function printViaBrowserWindow() {
                     font-size: 14px; /* 💡 字體改為 14px */
                     font-weight: bold;
                     line-height: 1.3; 
-                    /* 💡 總寬度設為 54mm */
-                    width: 54mm; 
-                    max-width: 54mm;
+                    /* 💡 總寬度設為 52mm */
+                    width: 52mm; 
+                    max-width: 52mm;
                     margin: 0; 
                     padding: 0; 
                     box-sizing: border-box;
@@ -281,7 +281,7 @@ function printViaBrowserWindow() {
                 .receipt-box {
                     page-break-after: always;
                     margin-bottom: 10px;
-                    width: 54mm;
+                    width: 52mm;
                 }
                 .receipt-main {
                     text-align: left; /* 主出貨單靠左 */
