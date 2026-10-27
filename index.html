@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>發票機批次出貨單列印系統</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #1a73e8;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 120px;
+            font-family: monospace;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-success { background: #34a853; color: white; }
+        .btn-success:hover { background: #2b8c42; }
+        .btn-warning { background: #fbbc04; color: #333; }
+        .btn-warning:hover { background: #f0b400; }
+        
+        .preview-section {
+            margin-top: 20px;
+        }
+        .receipt-preview {
+            background: #fff;
+            border: 1px dashed #999;
+            padding: 15px;
+            font-family: "Courier New", Courier, monospace;
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.4;
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .info-text {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>發票機批次出貨單列印系統</h1>
+    
+    <!-- 設定區 -->
+    <div class="form-group">
+        <div>
+            <label for="sheetName">分頁名稱 (月份):</label>
+            <input type="text" id="sheetName" value="10月" placeholder="例如: 10月 或 11月">
+        </div>
+        <div>
+            <label for="startRow">起始列:</label>
+            <input type="number" id="startRow" value="1" min="1">
+        </div>
+        <div>
+            <label for="endRow">結束列:</label>
+            <input type="number" id="endRow" value="50" min="1">
+        </div>
+    </div>
+
+    <div class="form-group" style="grid-template-columns: 1fr;">
+        <div>
+            <label for="rawInputData">貼上從 Google 試算表複製的資料 (A~M欄):</label>
+            <textarea id="rawInputData" placeholder="請直接從 Google 試算表中選取範圍 (A列到M列) 並貼到這裡..."></textarea>
+            <div class="info-text">提示：你可以直接在試算表框選範圍後 Ctrl+C，然後貼到上方框框內。</div>
+        </div>
+    </div>
+
+    <!-- 按鈕區 -->
+    <div class="btn-group">
+        <button class="btn-primary" onclick="processOrders()">1. 轉換並預覽格式</button>
+        <button class="btn-warning" onclick="connectPrinter()">2. 連接藍牙/USB發票機</button>
+        <button class="btn-success" onclick="batchPrintAndCut()">3. 執行批次列印與自動裁斷</button>
+    </div>
+
+    <!-- 預覽區 -->
+    <div class="preview-section">
+        <label>列印預覽 (熱感應紙格式):</label>
+        <div id="previewBox" class="receipt-preview">尚未產生預覽，請先貼上資料並點擊「轉換並預覽格式」。</div>
+    </div>
+</div>
+
+<!-- 引入邏輯腳本 -->
+<script src="script.js"></script>
+</body>
+</html>
