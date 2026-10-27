@@ -56,10 +56,8 @@ function processOrders() {
         return;
     }
 
-    // 💡【強力防呆】在最前端將試算表貼上時可能帶有的雙引號包裹換行（Excel/Sheets儲存格內換行的特徵）進行智慧清洗
-    // 將儲存格內部的換行暫時替換為空白，防止表格列被硬生生切斷
+    // 清洗儲存格內部的強制換行
     let cleanedText = rawText;
-    // 如果文字被雙引號包覆（代表儲存格內有換行），將其內部的換行符號清除
     cleanedText = cleanedText.replace(/"([^"]*?)"/g, (match, p1) => {
         return '"' + p1.replace(/[\r\n]+/g, ' ') + '"';
     });
@@ -75,7 +73,7 @@ function processOrders() {
                 rows.push(currentRow);
                 currentRow = [];
             }
-            let cols = line.split('\t').map(c => c.trim().replace(/^"|"$/g, '')); // 移除頭尾引號
+            let cols = line.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
             rows.push(cols);
         } else if (trimmed !== "") {
             currentRow.push(trimmed.replace(/^"|"$/g, ''));
@@ -94,15 +92,13 @@ function processOrders() {
     rows.forEach(row => {
         let orderNo = row[1] ? row[1].trim() : "";       
         let contact = row[3] ? row[3].trim() : "";       
-        let logisticsRaw = row[6] ? row[6].trim() : "";  
-        let itemName = row[8] ? row[8].trim() : "";      
         let quantity = row[9] ? row[9].trim() : "";      
         let totalAmount = row[12] ? row[12].trim() : ""; 
 
         // 全面掃描整列中的每一格，找出真正的訂單編號 (10~25碼英數字)
         row.forEach(cell => {
-            if (cell && /^[0-9A-Z]{10,25}$/.test(cell) && !cell.includes("TW") && !cell.includes("CD01")) {
-                if (cell !== "FALSE" && cell !== "₫") {
+            if (cell && /^[0-9A-Z]{10,25}$/.test(cell) && !cell.includes("TW") && !cell.includes("CG01") && !cell.includes("CD01")) {
+                if (cell !== "FALSE" && cell !== "₫" && cell !== "💀") {
                     orderNo = cell;
                 }
             }
@@ -172,25 +168,22 @@ function processOrders() {
             }
         }
 
-        // 智慧過濾商品名稱與數量
+        // 💡【完整保留模式】只要不是純系統代號與空白，商品欄打什麼就完整抓什麼，絕不漏掉任何字！
         row.forEach(cell => {
-            if (cell && cell.length > 1 && cell !== "FALSE" && cell !== "₫" && cell !== "←" && !cell.includes("CD01") && !cell.includes("TW") && !cell.includes("G975") && !cell.includes("261027")) {
+            if (cell && cell.length > 1 && cell !== "FALSE" && cell !== "₫" && cell !== "←" && !cell.includes("CG01") && !cell.includes("CD01") && !cell.includes("TW") && !cell.includes("GU1F") && !cell.includes("G975")) {
                 if (cell === currentOrderNo || cell === foundAddressMemo) return;
+                // 排除純粹是物流或聯絡人的格子
+                if (cell === foundLogistics || cell === orders[currentOrderNo].contact) return;
 
                 let cleanName = cell;
-                let codeMatch = cleanName.match(/^(.*?)(\d{6,})$/);
-                if (codeMatch) {
-                    cleanName = codeMatch[1].trim();
-                }
 
-                if (cleanName.includes("白身") || cleanName.includes("加速劑") || cleanName.includes("膠") || cleanName.includes("名片") || cleanName.includes("50G") || cleanName.includes("春")) {
-                    let exists = orders[currentOrderNo].items.some(i => i.name === cleanName);
-                    if (!exists) {
-                        orders[currentOrderNo].items.push({
-                            name: cleanName,
-                            qty: quantity && !isNaN(quantity) ? quantity : ""
-                        });
-                    }
+                // 檢查有沒有重複加進去
+                let exists = orders[currentOrderNo].items.some(i => i.name === cleanName);
+                if (!exists) {
+                    orders[currentOrderNo].items.push({
+                        name: cleanName,
+                        qty: quantity && !isNaN(quantity) ? quantity : ""
+                    });
                 }
             }
         });
