@@ -1,6 +1,6 @@
 let generatedReceipts = []; 
 
-// 當使用者在文字框貼上或輸入資料時，自動執行轉換與預覽
+// 當使用者貼上或輸入資料時，自動執行轉換與預覽
 document.addEventListener('DOMContentLoaded', () => {
     const inputArea = document.getElementById('rawInputData');
     if (inputArea) {
@@ -26,15 +26,18 @@ function processOrders() {
     let orders = {};
     let currentOrderNo = "";
 
+    // 取得今日日期 (格式: YYYY-MM-DD)
+    const today = new Date();
+    const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
     // 1. 抓取與向下填滿邏輯 (處理合併儲存格)
     rows.forEach(row => {
         if (row.length < 13) return;
 
-        let date = row[0] ? row[0].trim() : "";          // A 日期
         let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
         let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
-        let logistics = row[6] ? row[6].trim() : "";     // G 物流
-        let addressMemo = row[7] ? row[7].trim() : "";   // H 物流編號/地址/備註
+        let logistics = row[6] ? row[6].trim() : "";     // G 物流 (可能帶有 ➤ 備註)
+        let addressMemo = row[7] ? row[7].trim() : "";   // H 物流編號/地址
         let itemName = row[8] ? row[8].trim() : "";      // I 商品名稱
         let quantity = row[9] ? row[9].trim() : "";      // J 數量
         let totalAmount = row[12] ? row[12].trim() : ""; // M 總金額
@@ -46,15 +49,32 @@ function processOrders() {
         if (!currentOrderNo) return;
 
         if (!orders[currentOrderNo]) {
+            // 檢查 G 欄是否包含 ➤ 備註
+            let memoText = "";
+            if (logistics.includes("➤")) {
+                let parts = logistics.split("➤");
+                logistics = parts[0].trim(); // 清理掉備註後的物流主名稱
+                memoText = parts[1].trim();  // 抓出 ➤ 後面的文字
+            }
+
             orders[currentOrderNo] = {
-                date: date || "",
+                date: formattedDate,
                 orderNo: currentOrderNo,
                 contact: contact,
                 logistics: logistics,
                 addressMemo: addressMemo,
+                memo: memoText,
                 totalAmount: totalAmount,
                 items: []
             };
+        } else {
+            // 如果同一張訂單後續幾列的 G 欄也有帶備註但前面沒抓到，可在此補抓
+            if (!orders[currentOrderNo].memo && logistics.includes("➤")) {
+                let parts = logistics.split("➤");
+                logistics = parts[0].trim();
+                orders[currentOrderNo].memo = parts[1].trim();
+                orders[currentOrderNo].logistics = logistics;
+            }
         }
 
         if (itemName) {
@@ -65,7 +85,7 @@ function processOrders() {
         }
     });
 
-    // 2. 重新排版：移除冗字、數量前置【數量】緊黏商品名稱、無數量顯示【注意】
+    // 2. 重新排版：縮減線條長度防超出、粗實線、全形冒號不空格、商品【數量】緊黏
     generatedReceipts = [];
     let previewHtml = "";
 
@@ -73,26 +93,30 @@ function processOrders() {
         let ord = orders[key];
 
         let text = 
-`================================
-日期: ${ord.date}
-訂單: ${ord.orderNo}
-收件: ${ord.contact}
-================================
-物流: ${ord.logistics}
-地址: ${ord.addressMemo}
+`━━━━━━━━━━━━━━━━━━━━━━━
+日期：${ord.date}
+編號：${ord.orderNo}
+姓名：${ord.contact}
+━━━━━━━━━━━━━━━━━━━━━━━
+寄送方式：${ord.logistics}
+物流碼：${ord.addressMemo}
 --------------------------------\n`;
 
         ord.items.forEach(item => {
-            // 檢查數量是否存在，若無則顯示【注意】，若有則顯示【數量】並緊黏商品名稱
             let qtyStr = item.qty ? item.qty.trim() : "";
             let qtyDisplay = qtyStr !== "" ? `【${qtyStr}】` : `【注意】`;
             text += `${qtyDisplay}${item.name}\n`;
         });
 
+        // 如果有抓到 ➤ 後面的備註，顯示在商品下方
+        if (ord.memo) {
+            text += `備註：${ord.memo}\n`;
+        }
+
         text += 
 `--------------------------------
-總金額: $${ord.totalAmount}
-================================`;
+總金額：$${ord.totalAmount}
+━━━━━━━━━━━━━━━━━━━━━━━`;
 
         generatedReceipts.push(text);
         previewHtml += text + "\n\n================ [ 頁面分隔線 ] ================\n\n";
@@ -102,7 +126,7 @@ function processOrders() {
 }
 
 /**
- * 透過系統預設列印視窗批次送出（調整為左右滿版、邊距縮到最小）
+ * 透過系統預設列印視窗批次送出（強制 58mm 滿版、邊距歸零）
  */
 function printViaBrowserWindow() {
     if (generatedReceipts.length === 0) {
@@ -117,8 +141,8 @@ function printViaBrowserWindow() {
             <title>批次列印出貨單</title>
             <style>
                 @page {
-                    size: 58mm auto; /* 支援熱感應紙 58mm 寬度 */
-                    margin: 0;      /* 邊距歸零，達到左右滿版不浪費 */
+                    size: 58mm auto;
+                    margin: 0;
                 }
                 body { 
                     font-family: monospace; 
