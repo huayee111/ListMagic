@@ -91,7 +91,7 @@ function processOrders() {
     rows.forEach(row => {
         let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
         let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
-        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：物流
+        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：物流（可能帶有 ➤ 備註）
         let addressMemoRaw = row[7] ? row[7].trim() : "";// H 欄：物流碼
         let itemName = row[8] ? row[8].trim() : "";      // I 欄：商品名稱
         let quantity = row[9] ? row[9].trim() : "";      // J 欄：數量
@@ -112,36 +112,26 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
-        // 🔥【嚴格過濾 G 欄與 H 欄】排除「←」或空白，確保抓到真正的寄送方式與物流碼
+        // 🔥【精準解析 G 欄】物流與備註（只抓 G 欄的 ➤ 後方文字）
         let logistics = "";
+        let foundMemo = "";
+
         if (logisticsRaw && logisticsRaw !== "←" && !logisticsRaw.startsWith("←")) {
-            logistics = logisticsRaw;
+            if (logisticsRaw.includes("➤")) {
+                let parts = logisticsRaw.split("➤");
+                logistics = parts[0].trim();
+                if (parts[1] && parts[1].trim() !== "") {
+                    foundMemo = parts[1].trim();
+                }
+            } else {
+                logistics = logisticsRaw;
+            }
         }
 
+        // 處理 H 欄物流碼（避開 ← 符號）
         let addressMemo = "";
         if (addressMemoRaw && addressMemoRaw !== "←" && !addressMemoRaw.startsWith("←")) {
             addressMemo = addressMemoRaw;
-        }
-
-        let foundMemo = "";
-
-        // 1. 檢查 G 欄是否帶有 ➤ 備註
-        if (logisticsRaw.includes("➤")) {
-            let parts = logisticsRaw.split("➤");
-            logistics = parts[0].trim();
-            if (parts[1] && parts[1].trim() !== "") {
-                foundMemo = parts[1].trim();
-            }
-        }
-
-        // 2. 檢查 H 欄是否帶有 ➤ 備註
-        if (addressMemoRaw.includes("➤")) {
-            let parts = addressMemoRaw.split("➤");
-            addressMemo = parts[0].trim();
-            if (parts[1] && parts[1].trim() !== "") {
-                let memoCandidate = parts[1].trim();
-                foundMemo = foundMemo ? foundMemo + " " + memoCandidate : memoCandidate;
-            }
         }
 
         if (!orders[currentOrderNo]) {
