@@ -2,7 +2,6 @@ let generatedReceipts = [];
 
 // ==========================================
 // 💡 【隨時自由編輯區】商品專屬貼心小叮嚀設定
-// 只要商品名稱包含左邊的「關鍵字」，就會在出貨單後方獨立印出一張小叮嚀卡片
 // ==========================================
 const memoRules = [
     {
@@ -57,14 +56,12 @@ function processOrders() {
         return;
     }
 
-    // 以行為單位進行初步清理，濾除空行與純雜訊行
     const rawLines = rawText.split('\n');
     let rows = [];
     let currentRow = [];
 
     rawLines.forEach(line => {
         let trimmed = line.trim();
-        // 如果遇到含有 Tab (代表一列的完整欄位切分)，視為一筆完整或部分列
         if (line.includes('\t')) {
             if (currentRow.length > 0) {
                 rows.push(currentRow);
@@ -73,7 +70,6 @@ function processOrders() {
             let cols = line.split('\t').map(c => c.trim());
             rows.push(cols);
         } else if (trimmed !== "") {
-            // 如果是被拆散的單行文字，暫存起來準備進行黏合
             currentRow.push(trimmed);
         }
     });
@@ -84,24 +80,19 @@ function processOrders() {
     let orders = {};
     let currentOrderNo = "";
 
-    // 取得今日日期 (格式: YYYY-MM-DD)
     const today = new Date();
     const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-    // 走訪每一列資料進行智慧解析
     rows.forEach(row => {
-        // 如果這一列是陣列但長度太短，嘗試從中萃取關鍵資訊
         let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
         let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
-        let logistics = row[6] ? row[6].trim() : "";     // G 物流 (可能帶有 ➤ 備註)
+        let logistics = row[6] ? row[6].trim() : "";     // G 物流
         let addressMemo = row[7] ? row[7].trim() : "";   // H 物流編號/地址
         let itemName = row[8] ? row[8].trim() : "";      // I 商品名稱
-        let quantity = row[9] ? row[9].trim() : "";      // J 欄或可能位移的數量
+        let quantity = row[9] ? row[9].trim() : "";      // J 數量
         let totalAmount = row[12] ? row[12].trim() : ""; // M 總金額
 
-        // 防呆：如果 row[1] 不是訂單編號格式，嘗試在整行文字中尋找符合訂單編號特徵的字串
         if (!orderNo || orderNo.length < 5 || orderNo.includes('₫') || orderNo.includes('FALSE')) {
-            // 尋找整行中有沒有像訂單編號的文字
             row.forEach(cell => {
                 if (cell && cell.length >= 10 && /^[0-9A-Z]{10,20}$/.test(cell)) {
                     orderNo = cell;
@@ -116,7 +107,6 @@ function processOrders() {
         if (!currentOrderNo) return;
 
         if (!orders[currentOrderNo]) {
-            // 清理物流與 G 欄備註
             let memoText = "";
             if (logistics.includes("➤")) {
                 let parts = logistics.split("➤");
@@ -135,7 +125,6 @@ function processOrders() {
                 items: []
             };
         } else {
-            // 補充更新空白欄位
             if (!orders[currentOrderNo].contact && contact && contact !== "FALSE") orders[currentOrderNo].contact = contact;
             if (!orders[currentOrderNo].logistics && logistics && logistics !== "FALSE") orders[currentOrderNo].logistics = logistics;
             if (!orders[currentOrderNo].addressMemo && addressMemo && addressMemo !== "FALSE") orders[currentOrderNo].addressMemo = addressMemo;
@@ -144,16 +133,13 @@ function processOrders() {
             }
         }
 
-        // 智慧過濾商品名稱與數量（排除系統雜訊如 ₫, FALSE, ← 等）
         if (itemName && itemName !== "FALSE" && itemName !== "₫" && itemName !== "←") {
-            // 如果數量欄位有抓到，直接使用；若沒抓到，嘗試從品名結尾分離數量
             let cleanQty = quantity;
             let cleanName = itemName;
 
             if (!cleanQty || isNaN(cleanQty)) {
-                // 檢查品名後面是否有數字黏在一起的情況
                 let match = itemName.match(/(.*?)(\d+)$/);
-                if (match && match[2].length <= 2) { // 假設數量通常在 1~2 位數以內
+                if (match && match[2].length <= 2) {
                     cleanName = match[1].trim();
                     cleanQty = match[2];
                 }
@@ -166,13 +152,13 @@ function processOrders() {
         }
     });
 
-    // 重新排版與預覽產出
     generatedReceipts = [];
     let previewHtml = "";
 
     for (let key in orders) {
         let ord = orders[key];
 
+        // 主出貨單（維持靠左對齊）
         let mainReceipt = 
 `━━━━━━━━━━━━━━━━━━━━━━━
 日期：${ord.date}
@@ -198,16 +184,21 @@ function processOrders() {
 總金額：$${ord.totalAmount}
 ━━━━━━━━━━━━━━━━━━━━━━━`;
 
-        generatedReceipts.push(mainReceipt);
+        generatedReceipts.push({ type: 'main', content: mainReceipt });
         previewHtml += mainReceipt + "\n\n================ [ 主單裁切處 ] ================\n\n";
 
-        // 檢查小叮嚀卡片規則
+        // 小叮嚀卡片（加入 Set 防重複，且標記為置中類型）
+        let printedKeywords = new Set();
         ord.items.forEach(item => {
             memoRules.forEach(rule => {
-                if (item.name.includes(rule.keyword)) {
-                    let slipText = `\n${rule.content}\n`;
-                    generatedReceipts.push(slipText);
-                    previewHtml += slipText + "\n---------------- [ 小叮嚀卡片裁切處 ] ----------------\n\n";
+                if (item.name.includes(rule.keyword) && !printedKeywords.has(rule.keyword)) {
+                    printedKeywords.add(rule.keyword);
+                    let slipText = 
+`━━━━━━━━━━━━━━━━━━━━━━━
+${rule.content}
+━━━━━━━━━━━━━━━━━━━━━━━`;
+                    generatedReceipts.push({ type: 'memo', content: slipText });
+                    previewHtml += slipText + "\n\n---------------- [ 小叮嚀卡片裁切處 (置中) ] ----------------\n\n";
                 }
             });
         });
@@ -217,7 +208,7 @@ function processOrders() {
 }
 
 /**
- * 透過系統預設列印視窗批次送出
+ * 透過系統預設列印視窗批次送出（主單靠左、小叮嚀置中）
  */
 function printViaBrowserWindow() {
     if (generatedReceipts.length === 0) {
@@ -241,24 +232,38 @@ function printViaBrowserWindow() {
                     font-weight: bold;
                     line-height: 1.3; 
                     width: 58mm; 
+                    max-width: 58mm;
                     margin: 0; 
                     padding: 2px; 
+                    box-sizing: border-box;
                 }
                 pre { 
                     white-space: pre-wrap; 
                     margin: 0; 
+                    width: 100%;
+                    word-break: break-all;
                 }
                 .receipt-box {
                     page-break-after: always;
                     margin-bottom: 10px;
+                    width: 58mm;
+                }
+                /* 主出貨單保持靠左對齊 */
+                .receipt-main {
+                    text-align: left;
+                }
+                /* 小叮嚀卡片強制文字置中對齊 */
+                .receipt-memo {
+                    text-align: center;
                 }
             </style>
         </head>
         <body>
     `;
     
-    generatedReceipts.forEach(receipt => {
-        fullHtml += `<div class="receipt-box"><pre>${receipt}</pre></div>`;
+    generatedReceipts.forEach(item => {
+        let className = item.type === 'memo' ? 'receipt-memo' : 'receipt-main';
+        fullHtml += `<div class="receipt-box ${className}"><pre>${item.content}</pre></div>`;
     });
     
     fullHtml += `
