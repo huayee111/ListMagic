@@ -5,16 +5,32 @@ let generatedReceipts = [];
 // ==========================================
 const memoRules = [
     {
-        keyword: "缺氧膠",
-        content: "【貼心小叮嚀】\n感謝您購買台製缺氧膠\n使用時請保持通風，若不慎接觸皮膚\n請用大量清水沖洗並尋求協助。"
+        keyword: "樣品",
+        content: "\n親愛的買家您好！\n感謝您購買本公司的產品\n在此附贈樣品供您試用\n歡迎加入客服或來電詢問\n期待再次替您服務！"
     },
     {
-        keyword: "加速劑",
-        content: "【貼心小叮嚀】\n感謝您購買加速劑\n本產品具揮發性，請存放於陰涼處\n並避免兒童接觸。"
+        keyword: "UV光速膠",
+        content: "【貼心小叮嚀】：\n感謝您購買UV光速膠\n開封後請盡速使用完畢以免膠體硬化，如未使用完請確實密封完全，並盡可能的盡速使用完畢喲！\n期待再次替您服務！"
     },
     {
-        keyword: "AB膠",
-        content: "【貼心小叮嚀】\n感謝您購買AB膠\n使用時請以量杯秤【體積比】1:1的方式\n同方向混合、切忌不規則攪拌，\n請勿大量混合及攪拌過久導致膠\n體瞬間硬化喲！\n期待再次替您服務！"
+        keyword: "2：1 AB膠",
+        content: "【貼心小叮嚀】：\n感謝您購買2：1 AB膠\n請用【重量比】2：1 的方式以同方向混合、切忌不規則攪拌，請務必確實混合才能確保AB膠完全硬化喲！可放置在50度左右的烘箱中去除氣泡！\n期待再次替您服務！"
+    },
+    {
+        keyword: "(加強型4hr)",
+        content: "【貼心小叮嚀】：\n感謝您購買加強型 AB膠\n請用【體積比】1：1的方式以同方向混合、切忌不規則攪拌，連同容器邊緣與刮刀上的膠都要刮下來，確實混合才能確保AB膠完全硬化喲！若覺得混合前的膠體難以攪拌，可以隔水加熱軟化膠體！\n期待再次替您服務！"
+    },
+    {
+        keyword: "(基本型4hr)",
+        content: "【貼心小叮嚀】：\n感謝您購買基本型 AB膠\n請用【體積比】1：1的方式以同方向混合、切忌不規則攪拌，連同容器邊緣與刮刀上的膠都要刮下來，確實混合才能確保AB膠完全硬化喲！若覺得混合前的膠體難以攪拌，可以隔水加熱軟化膠體！\n期待再次替您服務！"
+    },
+    {
+        keyword: "(5分)",
+        content: "【貼心小叮嚀】：\n感謝您購買AB膠(5分)\n請用【體積比】1：1的方式以同方向混合、切忌不規則攪拌，「請勿大量混合」及攪拌過久導致膠體瞬間硬化！若覺得混合前的膠體難以攪拌，可以隔水加熱軟化膠體！\n期待再次替您服務！"
+    },
+    {
+        keyword: "(30分)",
+        content: "【貼心小叮嚀】：\n感謝您購買AB膠(30分)\n請用【體積比】1：1的方式以同方向混合、切忌不規則攪拌，連同容器邊緣與刮刀上的膠都要刮下來，確實混合才能確保AB膠完全硬化喲！若覺得混合前的膠體難以攪拌，可以隔水加熱軟化膠體！\n期待再次替您服務！"
     }
 ];
 
@@ -175,15 +191,16 @@ function processOrders() {
     for (let key in orders) {
         let ord = orders[key];
 
+        // 💡 粗線改為 12 格 (━━━━━━━━━━━━)
         let mainReceipt = 
-`━━━━━━━━━━━━━━
+`━━━━━━━━━━━━
 日期：${ord.date}
 編號：${ord.orderNo}
 姓名：${ord.contact}
-━━━━━━━━━━━━━━
+━━━━━━━━━━━━
 寄送方式：${ord.logistics}
 物流碼：${ord.addressMemo}
---------------------\n`;
+---------------------\n`;
 
         if (ord.items.length > 0) {
             ord.items.forEach(item => {
@@ -200,9 +217,9 @@ function processOrders() {
         }
 
         mainReceipt += 
-`--------------------
+`---------------------
 總金額：$${ord.totalAmount}
-━━━━━━━━━━━━━━`;
+━━━━━━━━━━━━`;
 
         generatedReceipts.push({ type: 'main', content: mainReceipt });
         previewHtml += mainReceipt + "\n\n================ [ 主單裁切處 ] ================\n\n";
@@ -213,10 +230,7 @@ function processOrders() {
             memoRules.forEach(rule => {
                 if (item.name.includes(rule.keyword) && !printedKeywords.has(rule.keyword)) {
                     printedKeywords.add(rule.keyword);
-                    let slipText = 
-`━━━━━━━━━━━━━━
-${rule.content}
-━━━━━━━━━━━━━━`;
+                    let slipText = rule.content;
                     generatedReceipts.push({ type: 'memo', content: slipText });
                     previewHtml += slipText + "\n\n---------------- [ 小叮嚀卡片裁切處 (置中) ] ----------------\n\n";
                 }
@@ -248,12 +262,12 @@ function printViaBrowserWindow() {
                 }
                 body { 
                     font-family: monospace; 
-                    font-size: 15px; 
+                    font-size: 14px; /* 💡 字體改為 14px */
                     font-weight: bold;
                     line-height: 1.3; 
-                    /* 💡 總寬度設為 50mm，扣掉左側 4mm 硬體盲區與右側 4mm 留白，完美置中平衡 */
-                    width: 50mm; 
-                    max-width: 50mm;
+                    /* 💡 總寬度設為 54mm */
+                    width: 54mm; 
+                    max-width: 54mm;
                     margin: 0; 
                     padding: 0; 
                     box-sizing: border-box;
@@ -267,10 +281,10 @@ function printViaBrowserWindow() {
                 .receipt-box {
                     page-break-after: always;
                     margin-bottom: 10px;
-                    width: 50mm;
+                    width: 54mm;
                 }
                 .receipt-main {
-                    text-align: left; /* 主出貨單維持靠左 */
+                    text-align: left; /* 主出貨單靠左 */
                 }
                 .receipt-memo {
                     text-align: center; /* 小叮嚀卡片置中 */
