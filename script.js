@@ -5,32 +5,16 @@ let generatedReceipts = [];
 // ==========================================
 const memoRules = [
     {
-        keyword: "樣品",
-        content: "\n親愛的買家您好！\n感謝您購買本公司的產品\n在此附贈樣品供您試用\n歡迎加入客服或來電詢問\n期待再次替您服務！"
+        keyword: "缺氧膠",
+        content: "【貼心小叮嚀】\n感謝您購買台製缺氧膠\n使用時請保持通風，若不慎接觸皮膚\n請用大量清水沖洗並尋求協助。"
     },
     {
-        keyword: "UV光速膠",
-        content: "【貼心小叮嚀】：\n感謝您購買UV光速膠\n開封後請盡速使用完畢以免膠體硬化，如未使用完請確實密封完全，並盡可能的盡速使用完畢喲！\n期待再次替您服務！"
+        keyword: "加速劑",
+        content: "【貼心小叮嚀】\n感謝您購買加速劑\n本產品具揮發性，請存放於陰涼處\n並避免兒童接觸。"
     },
     {
-        keyword: "2：1 AB膠",
-        content: "【貼心小叮嚀】：\n感謝您購買2：1 AB膠\n請用【重量比】2：1 的方式以同方向混合、切忌不規則攪拌，請務必確實混合才能確保AB膠完全硬化喲！可放置在50度左右的烘箱中去除氣泡！\n期待再次替您服務！"
-    },
-    {
-        keyword: "(加強型4hr)",
-        content: "【貼心小叮嚀】：\n感謝您購買加強型 AB膠\n請用【體積比】1：1的方式以同方向混合、切忌不規則攪拌，連同容器邊緣與刮刀上的膠都要刮下來，確實混合才能確保AB膠完全硬化喲！若覺得混合前的膠體難以攪拌，可以隔水加熱軟化膠體！\n期待再次替您服務！"
-    },
-    {
-        keyword: "(基本型4hr)",
-        content: "【貼心小叮嚀】：\n感謝您購買基本型 AB膠\n請用【體積比】1：1的方式以同方向混合、切忌不規則攪拌，連同容器邊緣與刮刀上的膠都要刮下來，確實混合才能確保AB膠完全硬化喲！若覺得混合前的膠體難以攪拌，可以隔水加熱軟化膠體！\n期待再次替您服務！"
-    },
-    {
-        keyword: "(5分)",
-        content: "【貼心小叮嚀】：\n感謝您購買AB膠(5分)\n請用【體積比】1：1的方式以同方向混合、切忌不規則攪拌，「請勿大量混合」及攪拌過久導致膠體瞬間硬化！若覺得混合前的膠體難以攪拌，可以隔水加熱軟化膠體！\n期待再次替您服務！"
-    },
-    {
-        keyword: "(30分)",
-        content: "【貼心小叮嚀】：\n感謝您購買AB膠(30分)\n請用【體積比】1：1的方式以同方向混合、切忌不規則攪拌，連同容器邊緣與刮刀上的膠都要刮下來，確實混合才能確保AB膠完全硬化喲！若覺得混合前的膠體難以攪拌，可以隔水加熱軟化膠體！\n期待再次替您服務！"
+        keyword: "AB膠",
+        content: "【貼心小叮嚀】\n感謝您購買AB膠\n使用時請以量杯秤【體積比】1:1的方式\n同方向混合、切忌不規則攪拌，\n請勿大量混合及攪拌過久導致膠\n體瞬間硬化喲！\n期待再次替您服務！"
     }
 ];
 
@@ -91,7 +75,7 @@ function processOrders() {
     rows.forEach(row => {
         let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
         let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
-        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：物流（可能帶有 ➤ 備註）
+        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：物流
         let addressMemoRaw = row[7] ? row[7].trim() : "";// H 欄：物流碼
         let itemName = row[8] ? row[8].trim() : "";      // I 欄：商品名稱
         let quantity = row[9] ? row[9].trim() : "";      // J 欄：數量
@@ -112,26 +96,36 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
-        // 🔥【精準解析 G 欄】物流與備註（只抓 G 欄的 ➤ 後方文字）
+        // 嚴格過濾 G 欄與 H 欄，排除下拉選單的 ← 符號
         let logistics = "";
-        let foundMemo = "";
-
         if (logisticsRaw && logisticsRaw !== "←" && !logisticsRaw.startsWith("←")) {
-            if (logisticsRaw.includes("➤")) {
-                let parts = logisticsRaw.split("➤");
-                logistics = parts[0].trim();
-                if (parts[1] && parts[1].trim() !== "") {
-                    foundMemo = parts[1].trim();
-                }
-            } else {
-                logistics = logisticsRaw;
-            }
+            logistics = logisticsRaw;
         }
 
-        // 處理 H 欄物流碼（避開 ← 符號）
         let addressMemo = "";
         if (addressMemoRaw && addressMemoRaw !== "←" && !addressMemoRaw.startsWith("←")) {
             addressMemo = addressMemoRaw;
+        }
+
+        let foundMemo = "";
+
+        // 1. 檢查 G 欄是否帶有 ➤ 備註
+        if (logisticsRaw.includes("➤")) {
+            let parts = logisticsRaw.split("➤");
+            logistics = parts[0].trim();
+            if (parts[1] && parts[1].trim() !== "") {
+                foundMemo = parts[1].trim();
+            }
+        }
+
+        // 2. 檢查 H 欄是否帶有 ➤ 備註
+        if (addressMemoRaw.includes("➤")) {
+            let parts = addressMemoRaw.split("➤");
+            addressMemo = parts[0].trim();
+            if (parts[1] && parts[1].trim() !== "") {
+                let memoCandidate = parts[1].trim();
+                foundMemo = foundMemo ? foundMemo + " " + memoCandidate : memoCandidate;
+            }
         }
 
         if (!orders[currentOrderNo]) {
@@ -157,7 +151,7 @@ function processOrders() {
             }
         }
 
-        // 💡【精準鎖定 I 欄商品】保留所有商品文字，並自動切除後方黏到的長串條碼數字
+        // 精準鎖定 I 欄商品，保留所有文字，並自動切除後方黏到的長串條碼數字
         if (itemName && itemName !== "FALSE" && itemName !== "₫" && itemName !== "←" && itemName !== "💀" && !itemName.startsWith("←")) {
             let cleanName = itemName;
             let codeMatch = cleanName.match(/^(.*?)(\d{8,})$/);
@@ -257,10 +251,11 @@ function printViaBrowserWindow() {
                     font-size: 15px; 
                     font-weight: bold;
                     line-height: 1.3; 
-                    width: 58mm; 
-                    max-width: 58mm;
+                    /* 💡 總寬度設為 50mm，扣掉左側 4mm 硬體盲區與右側 4mm 留白，完美置中平衡 */
+                    width: 50mm; 
+                    max-width: 50mm;
                     margin: 0; 
-                    padding: 2px; 
+                    padding: 0; 
                     box-sizing: border-box;
                 }
                 pre { 
@@ -272,13 +267,13 @@ function printViaBrowserWindow() {
                 .receipt-box {
                     page-break-after: always;
                     margin-bottom: 10px;
-                    width: 58mm;
+                    width: 50mm;
                 }
                 .receipt-main {
-                    text-align: left;
+                    text-align: left; /* 主出貨單維持靠左 */
                 }
                 .receipt-memo {
-                    text-align: center;
+                    text-align: center; /* 小叮嚀卡片置中 */
                 }
             </style>
         </head>
