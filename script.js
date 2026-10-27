@@ -90,12 +90,13 @@ function processOrders() {
     const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     rows.forEach(row => {
-        let orderNo = row[1] ? row[1].trim() : "";       
-        let contact = row[3] ? row[3].trim() : "";       
-        let quantity = row[9] ? row[9].trim() : "";      
-        let totalAmount = row[12] ? row[12].trim() : ""; 
+        let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
+        let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
+        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 物流
+        let addressMemoRaw = row[7] ? row[7].trim() : "";// H 物流碼/地址
+        let totalAmount = row[12] ? row[12].trim() : ""; // M 總金額
 
-        // 全面掃描整列中的每一格，找出真正的訂單編號 (10~25碼英數字)
+        // 智慧尋找訂單編號
         row.forEach(cell => {
             if (cell && /^[0-9A-Z]{10,25}$/.test(cell) && !cell.includes("TW") && !cell.includes("CG01") && !cell.includes("CD01")) {
                 if (cell !== "FALSE" && cell !== "₫" && cell !== "💀") {
@@ -110,56 +111,35 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
-        // 全面掃描整列，尋找物流與物流碼
-        let foundLogistics = "超商寄送";
-        let foundAddressMemo = "";
+        // 專門解析 G 欄：分離物流名稱與 ➤ 後方的備註
+        let logistics = logisticsRaw;
         let foundMemo = "";
-
-        row.forEach(cell => {
-            if (cell) {
-                if (cell.includes("7-11") || cell.includes("全家") || cell.includes("蝦皮店到店") || cell.includes("萊爾富") || cell.includes("OK")) {
-                    if (cell.length > 10) {
-                        let match = cell.match(/^(7-11|全家|蝦皮店到店|萊爾富|OK)(.*)$/);
-                        if (match) {
-                            foundLogistics = match[1];
-                            foundAddressMemo = match[2].trim();
-                        } else {
-                            foundAddressMemo = cell;
-                        }
-                    } else {
-                        foundLogistics = cell;
-                    }
-                } else if (cell.startsWith("TW") || /^[A-Z0-9]{12,}$/.test(cell)) {
-                    foundAddressMemo = cell;
-                }
-
-                if (cell.includes("➤")) {
-                    let parts = cell.split("➤");
-                    if (parts[1] && parts[1].trim() !== "") {
-                        let memoCandidate = parts[1].trim();
-                        if (!foundMemo.includes(memoCandidate)) {
-                            foundMemo = foundMemo ? foundMemo + " " + memoCandidate : memoCandidate;
-                        }
-                    }
-                }
+        if (logisticsRaw.includes("➤")) {
+            let parts = logisticsRaw.split("➤");
+            logistics = parts[0].trim();
+            if (parts[1] && parts[1].trim() !== "") {
+                foundMemo = parts[1].trim();
             }
-        });
+        }
+
+        // 鎖定 H 欄作為物流碼 (如果 H 欄為空，則 fallback 使用 G 欄的物流名稱)
+        let addressMemo = addressMemoRaw && addressMemoRaw !== "FALSE" && addressMemoRaw !== "₫" ? addressMemoRaw : logistics;
 
         if (!orders[currentOrderNo]) {
             orders[currentOrderNo] = {
                 date: formattedDate,
                 orderNo: currentOrderNo,
                 contact: contact && contact.length < 15 && contact !== "FALSE" ? contact : "未命名",
-                logistics: foundLogistics,
-                addressMemo: foundAddressMemo || foundLogistics,
+                logistics: logistics || "超商寄送",
+                addressMemo: addressMemo,
                 memo: foundMemo,
                 totalAmount: totalAmount && !isNaN(totalAmount) ? totalAmount : "0",
                 items: []
             };
         } else {
             if (contact && contact.length < 15 && contact !== "FALSE") orders[currentOrderNo].contact = contact;
-            if (foundLogistics && foundLogistics !== "超商寄送") orders[currentOrderNo].logistics = foundLogistics;
-            if (foundAddressMemo) orders[currentOrderNo].addressMemo = foundAddressMemo;
+            if (logistics && logistics !== "超商寄送") orders[currentOrderNo].logistics = logistics;
+            if (addressMemoRaw && addressMemoRaw !== "FALSE") orders[currentOrderNo].addressMemo = addressMemoRaw;
             if (foundMemo && !orders[currentOrderNo].memo.includes(foundMemo)) {
                 orders[currentOrderNo].memo = orders[currentOrderNo].memo ? orders[currentOrderNo].memo + " " + foundMemo : foundMemo;
             }
@@ -168,21 +148,19 @@ function processOrders() {
             }
         }
 
-        // 💡【完整保留模式】只要不是純系統代號與空白，商品欄打什麼就完整抓什麼，絕不漏掉任何字！
+        // 💡【完整保留模式】商品欄打什麼就完整抓什麼，絕不漏掉任何字
         row.forEach(cell => {
             if (cell && cell.length > 1 && cell !== "FALSE" && cell !== "₫" && cell !== "←" && !cell.includes("CG01") && !cell.includes("CD01") && !cell.includes("TW") && !cell.includes("GU1F") && !cell.includes("G975")) {
-                if (cell === currentOrderNo || cell === foundAddressMemo) return;
-                // 排除純粹是物流或聯絡人的格子
-                if (cell === foundLogistics || cell === orders[currentOrderNo].contact) return;
+                if (cell === currentOrderNo || cell === addressMemoRaw) return;
+                if (cell === logisticsRaw || cell === orders[currentOrderNo].contact) return;
 
                 let cleanName = cell;
 
-                // 檢查有沒有重複加進去
                 let exists = orders[currentOrderNo].items.some(i => i.name === cleanName);
                 if (!exists) {
                     orders[currentOrderNo].items.push({
                         name: cleanName,
-                        qty: quantity && !isNaN(quantity) ? quantity : ""
+                        qty: ""
                     });
                 }
             }
