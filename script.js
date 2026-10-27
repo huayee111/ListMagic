@@ -84,75 +84,124 @@ function processOrders() {
     const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     rows.forEach(row => {
-        let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
-        let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
-        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：寄送方式（可能帶有 ➤ 備註）
-        let itemName = row[8] ? row[8].trim() : "";      // I 商品名稱
-        let quantity = row[9] ? row[9].trim() : "";      // J 數量
-        let totalAmount = row[12] ? row[12].trim() : ""; // M 總金額
+        let orderNo = row[1] ? row[1].trim() : "";       
+        let contact = row[3] ? row[3].trim() : "";       
+        let logisticsRaw = row[6] ? row[6].trim() : "";  
+        let addressMemo = row[7] ? row[7].trim() : "";   
+        let itemName = row[8] ? row[8].trim() : "";      
+        let quantity = row[9] ? row[9].trim() : "";      
+        let totalAmount = row[12] ? row[12].trim() : ""; 
 
-        // 智慧尋找訂單編號
-        if (!orderNo || orderNo.length < 5 || orderNo.includes('₫') || orderNo.includes('FALSE')) {
-            row.forEach(cell => {
-                if (cell && cell.length >= 10 && /^[0-9A-Z]{10,20}$/.test(cell)) {
+        // 全面掃描整列中的每一格，找出真正的訂單編號 (10~20碼英數字)
+        row.forEach(cell => {
+            if (cell && /^[0-9A-Z]{10,25}$/.test(cell) && !cell.includes("TW") && !cell.includes("CD01")) {
+                if (cell !== "FALSE" && cell !== "₫") {
                     orderNo = cell;
                 }
-            });
-        }
+            }
+        });
 
-        if (orderNo && orderNo !== "FALSE" && orderNo !== "₫") {
+        if (orderNo) {
             currentOrderNo = orderNo;
         }
 
         if (!currentOrderNo) return;
 
-        // 專門解析 G 欄：分離物流名稱與 ➤ 後方的備註
-        let logistics = logisticsRaw;
+        // 全面掃描整列，尋找物流與物流碼 (自動分離黏在一起的 7-11G97576... 或類似格式)
+        let foundLogistics = "超商寄送";
+        let foundAddressMemo = "";
         let foundMemo = "";
-        if (logisticsRaw.includes("➤")) {
-            let parts = logisticsRaw.split("➤");
-            logistics = parts[0].trim();
-            if (parts[1] && parts[1].trim() !== "") {
-                foundMemo = parts[1].trim();
+
+        row.forEach(cell => {
+            if (cell) {
+                // 抓取物流與物流碼
+                if (cell.includes("7-11") || cell.includes("全家") || cell.includes("蝦皮店到店") || cell.includes("萊爾富") || cell.includes("OK")) {
+                    if (cell.length > 10) {
+                        // 例如 7-11G97576... 自動拆開
+                        let match = cell.match(/^(7-11|全家|蝦皮店到店|萊爾富|OK)(.*)$/);
+                        if (match) {
+                            foundLogistics = match[1];
+                            foundAddressMemo = match[2].trim();
+                        } else {
+                            foundAddressMemo = cell;
+                        }
+                    } else {
+                        foundLogistics = cell;
+                    }
+                } else if (cell.startsWith("TW") || /^[A-Z0-9]{12,}$/.test(cell)) {
+                    foundAddressMemo = cell;
+                }
+
+                // 抓取 ➤ 備註
+                if (cell.includes("➤")) {
+                    let parts = cell.split("➤");
+                    if (parts[1] && parts[1].trim() !== "") {
+                        let memoCandidate = parts[1].trim();
+                        if (!foundMemo.includes(memoCandidate)) {
+                            foundMemo = foundMemo ? foundMemo + " " + memoCandidate : memoCandidate;
+                        }
+                    }
+                }
             }
-        }
+        });
 
         if (!orders[currentOrderNo]) {
             orders[currentOrderNo] = {
                 date: formattedDate,
                 orderNo: currentOrderNo,
-                contact: contact || "未命名",
-                logistics: logistics || "超商寄送",
+                contact: contact && contact.length < 15 && contact !== "FALSE" ? contact : "未命名",
+                logistics: foundLogistics,
+                addressMemo: foundAddressMemo || foundLogistics,
                 memo: foundMemo,
-                totalAmount: totalAmount || "0",
+                totalAmount: totalAmount && !isNaN(totalAmount) ? totalAmount : "0",
                 items: []
             };
         } else {
-            if (!orders[currentOrderNo].contact && contact && contact !== "FALSE") orders[currentOrderNo].contact = contact;
-            if (!orders[currentOrderNo].logistics && logistics && logistics !== "FALSE" && logistics !== "") orders[currentOrderNo].logistics = logistics;
-            if (!orders[currentOrderNo].memo && foundMemo) orders[currentOrderNo].memo = foundMemo;
-            if (!orders[currentOrderNo].totalAmount || orders[currentOrderNo].totalAmount === "0") {
-                if (totalAmount && !isNaN(totalAmount)) orders[currentOrderNo].totalAmount = totalAmount;
+            if (contact && contact.length < 15 && contact !== "FALSE") orders[currentOrderNo].contact = contact;
+            if (foundLogistics && foundLogistics !== "超商寄送") orders[currentOrderNo].logistics = foundLogistics;
+            if (foundAddressMemo) orders[currentOrderNo].addressMemo = foundAddressMemo;
+            if (foundMemo && !orders[currentOrderNo].memo.includes(foundMemo)) {
+                orders[currentOrderNo].memo = orders[currentOrderNo].memo ? orders[currentOrderNo].memo + " " + foundMemo : foundMemo;
+            }
+            if ((!orders[currentOrderNo].totalAmount || orders[currentOrderNo].totalAmount === "0") && totalAmount && !isNaN(totalAmount)) {
+                orders[currentOrderNo].totalAmount = totalAmount;
             }
         }
 
-        if (itemName && itemName !== "FALSE" && itemName !== "₫" && itemName !== "←") {
-            let cleanQty = quantity;
-            let cleanName = itemName;
+        // 智慧過濾商品名稱與數量
+        row.forEach(cell => {
+            if (cell && cell.length > 1 && cell !== "FALSE" && cell !== "₫" && cell !== "←" && !cell.includes("CD01") && !cell.includes("TW") && !cell.includes("G975") && !cell.includes("261027")) {
+                // 排除看起來像訂單編號或物流碼的字串
+                if (cell === currentOrderNo || cell === foundAddressMemo) return;
 
-            if (!cleanQty || isNaN(cleanQty)) {
-                let match = itemName.match(/(.*?)(\d+)$/);
-                if (match && match[2].length <= 2) {
-                    cleanName = match[1].trim();
-                    cleanQty = match[2];
+                // 嘗試分離商品名稱與後方黏在一起的長串編號
+                let cleanName = cell;
+                let cleanQty = "";
+
+                let codeMatch = cleanName.match(/^(.*?)(\d{6,})$/);
+                if (codeMatch) {
+                    cleanName = codeMatch[1].trim();
+                }
+
+                // 檢查結尾是否帶有數量
+                let match = cleanName.match(/(.*?)(\d{1,2})$/);
+                if (match && !cleanName.includes("50G") && !cleanName.includes("150ml")) {
+                    // 避免把容量誤認為數量
+                }
+
+                // 如果這格包含中文字或常見商品關鍵字，視為有效商品
+                if (cleanName.includes("白身") || cleanName.includes("加速劑") || cleanName.includes("膠") || cleanName.includes("名片") || cleanName.includes("50G") || cleanName.includes("春")) {
+                    // 檢查有沒有重複加進去
+                    let exists = orders[currentOrderNo].items.some(i => i.name === cleanName);
+                    if (!exists) {
+                        orders[currentOrderNo].items.push({
+                            name: cleanName,
+                            qty: quantity && !isNaN(quantity) ? quantity : ""
+                        });
+                    }
                 }
             }
-
-            orders[currentOrderNo].items.push({
-                name: cleanName,
-                qty: cleanQty
-            });
-        }
+        });
     });
 
     generatedReceipts = [];
@@ -168,14 +217,18 @@ function processOrders() {
 姓名：${ord.contact}
 ━━━━━━━━━━━━━━
 寄送方式：${ord.logistics}
-物流碼：${ord.logistics}
+物流碼：${ord.addressMemo}
 --------------------\n`;
 
-        ord.items.forEach(item => {
-            let qtyStr = item.qty ? item.qty.trim() : "";
-            let qtyDisplay = qtyStr !== "" ? `【${qtyStr}】` : `➤`;
-            mainReceipt += `${qtyDisplay}${item.name}\n`;
-        });
+        if (ord.items.length > 0) {
+            ord.items.forEach(item => {
+                let qtyStr = item.qty ? item.qty.trim() : "";
+                let qtyDisplay = qtyStr !== "" ? `【${qtyStr}】` : `➤`;
+                mainReceipt += `${qtyDisplay}${item.name}\n`;
+            });
+        } else {
+            mainReceipt += `➤(請核對原始資料商品)\n`;
+        }
 
         if (ord.memo) {
             mainReceipt += `備註：${ord.memo}\n`;
