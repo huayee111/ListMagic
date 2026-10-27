@@ -91,6 +91,8 @@ function processOrders() {
     rows.forEach(row => {
         let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
         let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
+        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：物流
+        let addressMemoRaw = row[7] ? row[7].trim() : "";// H 欄：物流碼
         let itemName = row[8] ? row[8].trim() : "";      // I 欄：商品名稱
         let quantity = row[9] ? row[9].trim() : "";      // J 欄：數量
         let totalAmount = row[12] ? row[12].trim() : ""; // M 欄：總金額
@@ -110,73 +112,45 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
-        // 🔥【智慧掃描物流、物流碼與備註】嚴格檢查格式，防止備註文字跑到物流碼裡面
-        let foundLogistics = "";
-        let foundAddressMemo = "";
+        // 專門解析 G 欄與 H 欄
+        let logistics = logisticsRaw;
+        let addressMemo = addressMemoRaw;
         let foundMemo = "";
 
-        row.forEach(cell => {
-            if (cell && cell !== "←" && !cell.startsWith("←")) {
-                // 1. 抓取超商名稱
-                if (cell.includes("7-11") || cell.includes("全家") || cell.includes("蝦皮店到店") || cell.includes("萊爾富") || cell.includes("OK") || cell.includes("店到店")) {
-                    if (cell.length > 15) {
-                        let match = cell.match(/^(7-11|全家|蝦皮店到店|萊爾富|OK|店到店)(.*)$/);
-                        if (match) {
-                            foundLogistics = match[1];
-                            let candidateMemo = match[2].trim();
-                            // 如果後方帶有 TW 物流碼
-                            if (candidateMemo.startsWith("TW") || /^[A-Z0-9]{10,}$/.test(candidateMemo)) {
-                                foundAddressMemo = candidateMemo;
-                            }
-                        } else {
-                            foundAddressMemo = cell;
-                        }
-                    } else {
-                        foundLogistics = cell;
-                    }
-                } 
-                // 2. 嚴格抓取物流碼 (必須是 TW 開頭，或純英數字且不含中文與標點符號)
-                else if (cell.startsWith("TW") || (/^[A-Z0-9]{10,25}$/.test(cell) && !cell.includes("CD01") && !cell.includes("CG01"))) {
-                    if (!cell.includes("蝦皮") && !cell.includes("叮噹") && !cell.includes("統編")) {
-                        foundAddressMemo = cell;
-                    }
-                }
-
-                // 3. 抓取 ➤ 備註
-                if (cell.includes("➤")) {
-                    let parts = cell.split("➤");
-                    if (parts[1] && parts[1].trim() !== "") {
-                        let memoCandidate = parts[1].trim();
-                        if (!foundMemo.includes(memoCandidate)) {
-                            foundMemo = foundMemo ? foundMemo + " " + memoCandidate : memoCandidate;
-                        }
-                    }
-                }
-
-                // 4. 【新增加】如果格子裡包含中文或備註性質的文字（例如統編、說明），自動轉入備註欄！
-                if (cell.length > 8 && (cell.includes("統編") || cell.includes("未稅") || cell.includes("客戶") || cell.includes("詢問") || cell.includes("打統編"))) {
-                    if (!foundMemo.includes(cell)) {
-                        foundMemo = foundMemo ? foundMemo + " " + cell : cell;
-                    }
-                }
+        // 1. 檢查 G 欄是否帶有 ➤ 備註
+        if (logisticsRaw.includes("➤")) {
+            let parts = logisticsRaw.split("➤");
+            logistics = parts[0].trim();
+            if (parts[1] && parts[1].trim() !== "") {
+                foundMemo = parts[1].trim();
             }
-        });
+        }
+
+        // 2. 檢查 H 欄是否帶有 ➤ 備註
+        if (addressMemoRaw.includes("➤")) {
+            let parts = addressMemoRaw.split("➤");
+            addressMemo = parts[0].trim();
+            if (parts[1] && parts[1].trim() !== "") {
+                let memoCandidate = parts[1].trim();
+                foundMemo = foundMemo ? foundMemo + " " + memoCandidate : memoCandidate;
+            }
+        }
 
         if (!orders[currentOrderNo]) {
             orders[currentOrderNo] = {
                 date: formattedDate,
                 orderNo: currentOrderNo,
                 contact: contact && contact.length < 15 && contact !== "FALSE" ? contact : "未命名",
-                logistics: foundLogistics || "超商寄送",
-                addressMemo: foundAddressMemo || foundLogistics || "無物流碼",
+                logistics: logistics || "超商寄送",
+                addressMemo: addressMemo && addressMemo !== "FALSE" && addressMemo !== "₫" ? addressMemo : "無物流碼",
                 memo: foundMemo,
                 totalAmount: totalAmount && !isNaN(totalAmount) ? totalAmount : "0",
                 items: []
             };
         } else {
             if (contact && contact.length < 15 && contact !== "FALSE") orders[currentOrderNo].contact = contact;
-            if (foundLogistics) orders[currentOrderNo].logistics = foundLogistics;
-            if (foundAddressMemo) orders[currentOrderNo].addressMemo = foundAddressMemo;
+            if (logistics && logistics !== "") orders[currentOrderNo].logistics = logistics;
+            if (addressMemo && addressMemo !== "FALSE" && addressMemo !== "") orders[currentOrderNo].addressMemo = addressMemo;
             if (foundMemo && !orders[currentOrderNo].memo.includes(foundMemo)) {
                 orders[currentOrderNo].memo = orders[currentOrderNo].memo ? orders[currentOrderNo].memo + " " + foundMemo : foundMemo;
             }
