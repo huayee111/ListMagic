@@ -158,20 +158,20 @@ function processOrders() {
     for (let key in orders) {
         let ord = orders[key];
 
-        // 主出貨單（維持靠左對齊）
+        // 主出貨單（粗線 14 格、細線 20 格、無數量改為 ➤）
         let mainReceipt = 
-`━━━━━━━━━━━━━━━━━━━━━━━
+`━━━━━━━━━━━━━━
 日期：${ord.date}
 編號：${ord.orderNo}
 姓名：${ord.contact}
-━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━
 寄送方式：${ord.logistics}
 物流碼：${ord.addressMemo}
---------------------------------\n`;
+--------------------\n`;
 
         ord.items.forEach(item => {
             let qtyStr = item.qty ? item.qty.trim() : "";
-            let qtyDisplay = qtyStr !== "" ? `【${qtyStr}】` : `【注意】`;
+            let qtyDisplay = qtyStr !== "" ? `【${qtyStr}】` : `➤`;
             mainReceipt += `${qtyDisplay}${item.name}\n`;
         });
 
@@ -180,23 +180,23 @@ function processOrders() {
         }
 
         mainReceipt += 
-`--------------------------------
+`--------------------
 總金額：$${ord.totalAmount}
-━━━━━━━━━━━━━━━━━━━━━━━`;
+━━━━━━━━━━━━━━`;
 
         generatedReceipts.push({ type: 'main', content: mainReceipt });
         previewHtml += mainReceipt + "\n\n================ [ 主單裁切處 ] ================\n\n";
 
-        // 小叮嚀卡片（加入 Set 防重複，且標記為置中類型）
+        // 小叮嚀卡片（粗線同樣維持 14 格，置中）
         let printedKeywords = new Set();
         ord.items.forEach(item => {
             memoRules.forEach(rule => {
                 if (item.name.includes(rule.keyword) && !printedKeywords.has(rule.keyword)) {
                     printedKeywords.add(rule.keyword);
                     let slipText = 
-`━━━━━━━━━━━━━━━━━━━━━━━
+`━━━━━━━━━━━━━━
 ${rule.content}
-━━━━━━━━━━━━━━━━━━━━━━━`;
+━━━━━━━━━━━━━━`;
                     generatedReceipts.push({ type: 'memo', content: slipText });
                     previewHtml += slipText + "\n\n---------------- [ 小叮嚀卡片裁切處 (置中) ] ----------------\n\n";
                 }
@@ -208,7 +208,7 @@ ${rule.content}
 }
 
 /**
- * 透過系統預設列印視窗批次送出（主單靠左、小叮嚀置中）
+ * 透過系統預設列印視窗批次送出
  */
 function printViaBrowserWindow() {
     if (generatedReceipts.length === 0) {
@@ -248,11 +248,9 @@ function printViaBrowserWindow() {
                     margin-bottom: 10px;
                     width: 58mm;
                 }
-                /* 主出貨單保持靠左對齊 */
                 .receipt-main {
                     text-align: left;
                 }
-                /* 小叮嚀卡片強制文字置中對齊 */
                 .receipt-memo {
                     text-align: center;
                 }
