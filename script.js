@@ -56,7 +56,15 @@ function processOrders() {
         return;
     }
 
-    const rawLines = rawText.split('\n');
+    // 💡【強力防呆】在最前端將試算表貼上時可能帶有的雙引號包裹換行（Excel/Sheets儲存格內換行的特徵）進行智慧清洗
+    // 將儲存格內部的換行暫時替換為空白，防止表格列被硬生生切斷
+    let cleanedText = rawText;
+    // 如果文字被雙引號包覆（代表儲存格內有換行），將其內部的換行符號清除
+    cleanedText = cleanedText.replace(/"([^"]*?)"/g, (match, p1) => {
+        return '"' + p1.replace(/[\r\n]+/g, ' ') + '"';
+    });
+
+    const rawLines = cleanedText.split('\n');
     let rows = [];
     let currentRow = [];
 
@@ -67,10 +75,10 @@ function processOrders() {
                 rows.push(currentRow);
                 currentRow = [];
             }
-            let cols = line.split('\t').map(c => c.trim());
+            let cols = line.split('\t').map(c => c.trim().replace(/^"|"$/g, '')); // 移除頭尾引號
             rows.push(cols);
         } else if (trimmed !== "") {
-            currentRow.push(trimmed);
+            currentRow.push(trimmed.replace(/^"|"$/g, ''));
         }
     });
     if (currentRow.length > 0) {
@@ -87,12 +95,11 @@ function processOrders() {
         let orderNo = row[1] ? row[1].trim() : "";       
         let contact = row[3] ? row[3].trim() : "";       
         let logisticsRaw = row[6] ? row[6].trim() : "";  
-        let addressMemo = row[7] ? row[7].trim() : "";   
         let itemName = row[8] ? row[8].trim() : "";      
         let quantity = row[9] ? row[9].trim() : "";      
         let totalAmount = row[12] ? row[12].trim() : ""; 
 
-        // 全面掃描整列中的每一格，找出真正的訂單編號 (10~20碼英數字)
+        // 全面掃描整列中的每一格，找出真正的訂單編號 (10~25碼英數字)
         row.forEach(cell => {
             if (cell && /^[0-9A-Z]{10,25}$/.test(cell) && !cell.includes("TW") && !cell.includes("CD01")) {
                 if (cell !== "FALSE" && cell !== "₫") {
@@ -107,17 +114,15 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
-        // 全面掃描整列，尋找物流與物流碼 (自動分離黏在一起的 7-11G97576... 或類似格式)
+        // 全面掃描整列，尋找物流與物流碼
         let foundLogistics = "超商寄送";
         let foundAddressMemo = "";
         let foundMemo = "";
 
         row.forEach(cell => {
             if (cell) {
-                // 抓取物流與物流碼
                 if (cell.includes("7-11") || cell.includes("全家") || cell.includes("蝦皮店到店") || cell.includes("萊爾富") || cell.includes("OK")) {
                     if (cell.length > 10) {
-                        // 例如 7-11G97576... 自動拆開
                         let match = cell.match(/^(7-11|全家|蝦皮店到店|萊爾富|OK)(.*)$/);
                         if (match) {
                             foundLogistics = match[1];
@@ -132,7 +137,6 @@ function processOrders() {
                     foundAddressMemo = cell;
                 }
 
-                // 抓取 ➤ 備註
                 if (cell.includes("➤")) {
                     let parts = cell.split("➤");
                     if (parts[1] && parts[1].trim() !== "") {
@@ -171,27 +175,15 @@ function processOrders() {
         // 智慧過濾商品名稱與數量
         row.forEach(cell => {
             if (cell && cell.length > 1 && cell !== "FALSE" && cell !== "₫" && cell !== "←" && !cell.includes("CD01") && !cell.includes("TW") && !cell.includes("G975") && !cell.includes("261027")) {
-                // 排除看起來像訂單編號或物流碼的字串
                 if (cell === currentOrderNo || cell === foundAddressMemo) return;
 
-                // 嘗試分離商品名稱與後方黏在一起的長串編號
                 let cleanName = cell;
-                let cleanQty = "";
-
                 let codeMatch = cleanName.match(/^(.*?)(\d{6,})$/);
                 if (codeMatch) {
                     cleanName = codeMatch[1].trim();
                 }
 
-                // 檢查結尾是否帶有數量
-                let match = cleanName.match(/(.*?)(\d{1,2})$/);
-                if (match && !cleanName.includes("50G") && !cleanName.includes("150ml")) {
-                    // 避免把容量誤認為數量
-                }
-
-                // 如果這格包含中文字或常見商品關鍵字，視為有效商品
                 if (cleanName.includes("白身") || cleanName.includes("加速劑") || cleanName.includes("膠") || cleanName.includes("名片") || cleanName.includes("50G") || cleanName.includes("春")) {
-                    // 檢查有沒有重複加進去
                     let exists = orders[currentOrderNo].items.some(i => i.name === cleanName);
                     if (!exists) {
                         orders[currentOrderNo].items.push({
