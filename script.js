@@ -1,14 +1,12 @@
 let generatedReceipts = []; 
 
-// 頁面載入完成後，綁定文字框的監聽事件
+// 當使用者在文字框貼上或輸入資料時，自動執行轉換與預覽
 document.addEventListener('DOMContentLoaded', () => {
     const inputArea = document.getElementById('rawInputData');
     if (inputArea) {
-        // 同時監聽 input (輸入) 與 keyup (放開鍵盤，確保 Ctrl+V 貼上時必能觸發)
         inputArea.addEventListener('input', processOrders);
         inputArea.addEventListener('keyup', processOrders);
         inputArea.addEventListener('paste', () => {
-            // 針對貼上動作給一點微小的時間差讓內容完整寫入文字框後再觸發
             setTimeout(processOrders, 100);
         });
     }
@@ -67,7 +65,7 @@ function processOrders() {
         }
     });
 
-    // 2. 重新排版（強化理貨辨識度、左右對齊）
+    // 2. 重新排版：移除冗字、數量前置【數量】緊黏商品名稱、無數量顯示【注意】
     generatedReceipts = [];
     let previewHtml = "";
 
@@ -81,19 +79,18 @@ function processOrders() {
 收件: ${ord.contact}
 ================================
 物流: ${ord.logistics}
-[地址]: ${ord.addressMemo}
---------------------------------
-[品名]                      [數量]
+地址: ${ord.addressMemo}
 --------------------------------\n`;
 
         ord.items.forEach(item => {
-            let nameFormatted = item.name.length > 18 ? item.name.substring(0, 16) + ".." : item.name;
-            let paddedName = nameFormatted.padEnd(22, ' ');
-            text += `${paddedName} x ${item.qty}\n`;
+            // 檢查數量是否存在，若無則顯示【注意】，若有則顯示【數量】並緊黏商品名稱
+            let qtyStr = item.qty ? item.qty.trim() : "";
+            let qtyDisplay = qtyStr !== "" ? `【${qtyStr}】` : `【注意】`;
+            text += `${qtyDisplay}${item.name}\n`;
         });
 
         text += 
-`================================
+`--------------------------------
 總金額: $${ord.totalAmount}
 ================================`;
 
@@ -105,7 +102,7 @@ function processOrders() {
 }
 
 /**
- * 透過系統預設列印視窗批次送出
+ * 透過系統預設列印視窗批次送出（調整為左右滿版、邊距縮到最小）
  */
 function printViaBrowserWindow() {
     if (generatedReceipts.length === 0) {
@@ -119,22 +116,26 @@ function printViaBrowserWindow() {
         <head>
             <title>批次列印出貨單</title>
             <style>
+                @page {
+                    size: 58mm auto; /* 支援熱感應紙 58mm 寬度 */
+                    margin: 0;      /* 邊距歸零，達到左右滿版不浪費 */
+                }
                 body { 
                     font-family: monospace; 
-                    font-size: 14px; 
-                    line-height: 1.4; 
+                    font-size: 15px; 
+                    font-weight: bold;
+                    line-height: 1.3; 
                     width: 58mm; 
                     margin: 0; 
-                    padding: 5px; 
+                    padding: 2px; 
                 }
                 pre { 
                     white-space: pre-wrap; 
                     margin: 0; 
-                    font-weight: bold;
                 }
                 .receipt-box {
                     page-break-after: always;
-                    margin-bottom: 20px;
+                    margin-bottom: 10px;
                 }
             </style>
         </head>
