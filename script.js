@@ -112,9 +112,17 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
-        // 專門解析 G 欄與 H 欄
-        let logistics = logisticsRaw;
-        let addressMemo = addressMemoRaw;
+        // 🔥【嚴格過濾 G 欄與 H 欄】排除「←」或空白，確保抓到真正的寄送方式與物流碼
+        let logistics = "";
+        if (logisticsRaw && logisticsRaw !== "←" && !logisticsRaw.startsWith("←")) {
+            logistics = logisticsRaw;
+        }
+
+        let addressMemo = "";
+        if (addressMemoRaw && addressMemoRaw !== "←" && !addressMemoRaw.startsWith("←")) {
+            addressMemo = addressMemoRaw;
+        }
+
         let foundMemo = "";
 
         // 1. 檢查 G 欄是否帶有 ➤ 備註
@@ -149,8 +157,8 @@ function processOrders() {
             };
         } else {
             if (contact && contact.length < 15 && contact !== "FALSE") orders[currentOrderNo].contact = contact;
-            if (logistics && logistics !== "") orders[currentOrderNo].logistics = logistics;
-            if (addressMemo && addressMemo !== "FALSE" && addressMemo !== "") orders[currentOrderNo].addressMemo = addressMemo;
+            if (logistics && logistics !== "" && logistics !== "←") orders[currentOrderNo].logistics = logistics;
+            if (addressMemo && addressMemo !== "FALSE" && addressMemo !== "" && addressMemo !== "←") orders[currentOrderNo].addressMemo = addressMemo;
             if (foundMemo && !orders[currentOrderNo].memo.includes(foundMemo)) {
                 orders[currentOrderNo].memo = orders[currentOrderNo].memo ? orders[currentOrderNo].memo + " " + foundMemo : foundMemo;
             }
