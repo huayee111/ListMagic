@@ -1,10 +1,16 @@
 let generatedReceipts = []; 
 
-// 當使用者在文字框貼上或輸入資料時，自動執行轉換與預覽
+// 頁面載入完成後，綁定文字框的監聽事件
 document.addEventListener('DOMContentLoaded', () => {
     const inputArea = document.getElementById('rawInputData');
     if (inputArea) {
+        // 同時監聽 input (輸入) 與 keyup (放開鍵盤，確保 Ctrl+V 貼上時必能觸發)
         inputArea.addEventListener('input', processOrders);
+        inputArea.addEventListener('keyup', processOrders);
+        inputArea.addEventListener('paste', () => {
+            // 針對貼上動作給一點微小的時間差讓內容完整寫入文字框後再觸發
+            setTimeout(processOrders, 100);
+        });
     }
 });
 
@@ -61,14 +67,13 @@ function processOrders() {
         }
     });
 
-    // 2. 重新排版（強化理貨辨識度、左右對齊、重點放大）
+    // 2. 重新排版（強化理貨辨識度、左右對齊）
     generatedReceipts = [];
     let previewHtml = "";
 
     for (let key in orders) {
         let ord = orders[key];
 
-        // 組合出貨單純文字格式 (不含多餘的裁切文字)
         let text = 
 `================================
 日期: ${ord.date}
@@ -82,7 +87,6 @@ function processOrders() {
 --------------------------------\n`;
 
         ord.items.forEach(item => {
-            // 讓品名與數量有明顯的寬度隔離，方便理貨人員核對
             let nameFormatted = item.name.length > 18 ? item.name.substring(0, 16) + ".." : item.name;
             let paddedName = nameFormatted.padEnd(22, ' ');
             text += `${paddedName} x ${item.qty}\n`;
