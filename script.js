@@ -47,22 +47,22 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function processOrders() {
-    const rawText = document.getElementById('rawInputData').value;
+    const rawText = document.getElementById('rawInputData');
     const previewBox = document.getElementById('previewBox');
 
-    if (!rawText.trim()) {
+    if (!rawText || !rawText.value.trim()) {
         previewBox.textContent = "尚未貼上資料，請在上方文字框貼上試算表內容。";
         generatedReceipts = [];
         return;
     }
 
+    let textValue = rawText.value;
     // 清洗儲存格內部的強制換行
-    let cleanedText = rawText;
-    cleanedText = cleanedText.replace(/"([^"]*?)"/g, (match, p1) => {
+    textValue = textValue.replace(/"([^"]*?)"/g, (match, p1) => {
         return '"' + p1.replace(/[\r\n]+/g, ' ') + '"';
     });
 
-    const rawLines = cleanedText.split('\n');
+    const rawLines = textValue.split('\n');
     let rows = [];
     let currentRow = [];
 
@@ -92,9 +92,11 @@ function processOrders() {
     rows.forEach(row => {
         let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
         let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
-        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 物流
-        let addressMemoRaw = row[7] ? row[7].trim() : "";// H 物流碼/地址
-        let totalAmount = row[12] ? row[12].trim() : ""; // M 總金額
+        let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：物流
+        let addressMemoRaw = row[7] ? row[7].trim() : "";// H 欄：物流碼
+        let itemName = row[8] ? row[8].trim() : "";      // I 欄：商品名稱 (🔥 鎖定這裡)
+        let quantity = row[9] ? row[9].trim() : "";      // J 欄：數量
+        let totalAmount = row[12] ? row[12].trim() : ""; // M 欄：總金額
 
         // 智慧尋找訂單編號
         row.forEach(cell => {
@@ -122,7 +124,19 @@ function processOrders() {
             }
         }
 
-        // 鎖定 H 欄作為物流碼 (如果 H 欄為空，則 fallback 使用 G 欄的物流名稱)
+        // 同時檢查整列有沒有其他夾帶的 ➤ 備註
+        row.forEach(cell => {
+            if (cell && cell.includes("➤")) {
+                let parts = cell.split("➤");
+                if (parts[1] && parts[1].trim() !== "") {
+                    let memoCandidate = parts[1].trim();
+                    if (!foundMemo.includes(memoCandidate)) {
+                        foundMemo = foundMemo ? foundMemo + " " + memoCandidate : memoCandidate;
+                    }
+                }
+            }
+        });
+
         let addressMemo = addressMemoRaw && addressMemoRaw !== "FALSE" && addressMemoRaw !== "₫" ? addressMemoRaw : logistics;
 
         if (!orders[currentOrderNo]) {
@@ -148,23 +162,23 @@ function processOrders() {
             }
         }
 
-        // 💡【完整保留模式】商品欄打什麼就完整抓什麼，絕不漏掉任何字
-        row.forEach(cell => {
-            if (cell && cell.length > 1 && cell !== "FALSE" && cell !== "₫" && cell !== "←" && !cell.includes("CG01") && !cell.includes("CD01") && !cell.includes("TW") && !cell.includes("GU1F") && !cell.includes("G975")) {
-                if (cell === currentOrderNo || cell === addressMemoRaw) return;
-                if (cell === logisticsRaw || cell === orders[currentOrderNo].contact) return;
-
-                let cleanName = cell;
-
-                let exists = orders[currentOrderNo].items.some(i => i.name === cleanName);
-                if (!exists) {
-                    orders[currentOrderNo].items.push({
-                        name: cleanName,
-                        qty: ""
-                    });
-                }
+        // 🔥【精準鎖定 I 欄商品】只抓取商品欄（I 欄），打什麼就完整保留什麼，絕對不誤抓其他欄位！
+        if (itemName && itemName !== "FALSE" && itemName !== "₫" && itemName !== "←" && itemName !== "💀") {
+            // 切除後方可能黏在一起的長串數字條碼（例如 味丹綠藻碇 600碇入1399399369 -> 味丹綠藻碇 600碇入）
+            let cleanName = itemName;
+            let codeMatch = cleanName.match(/^(.*?)(\d{8,})$/);
+            if (codeMatch) {
+                cleanName = codeMatch[1].trim();
             }
-        });
+
+            let exists = orders[currentOrderNo].items.some(i => i.name === cleanName);
+            if (!exists) {
+                orders[currentOrderNo].items.push({
+                    name: cleanName,
+                    qty: quantity && !isNaN(quantity) ? quantity : ""
+                });
+            }
+        }
     });
 
     generatedReceipts = [];
