@@ -9,6 +9,10 @@ const memoRules = [
         content: "\n親愛的買家您好！\n感謝您購買本公司的產品\n在此附贈樣品供您試用\n歡迎掃描名片加入客服\n或來電由專人替您服務\n非常期待您再次光臨！"
     },
     {
+        keyword: "春單",
+        content: "\n親愛的買家您好！\n感謝您購買本公司的產品\n在此附贈樣品供您試用\n歡迎掃描名片加入客服\n或來電由專人替您服務\n非常期待您再次光臨！"
+    },
+    {
         keyword: "UV光速膠",
         content: "【貼心小叮嚀】：\n感謝您購買UV光速膠\n開封後請盡速使用避免膠體硬化，如未使用完請確實密封完全，建議盡速使用完畢喲！\n期待再次替您服務！"
     },
@@ -90,7 +94,8 @@ function processOrders() {
 
     rows.forEach(row => {
         let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
-        let contact = row[3] ? row[3].trim() : "";       // D 聯絡人
+        let contactRaw = row[3] ? row[3].trim() : "";    // D 欄：聯絡人
+        let extraInfo = row[4] ? row[4].trim() : "";     // E 欄：附加資訊 (如電話、分機)
         let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：物流
         let addressMemoRaw = row[7] ? row[7].trim() : "";// H 欄：物流碼
         let itemName = row[8] ? row[8].trim() : "";      // I 欄：商品名稱
@@ -111,6 +116,15 @@ function processOrders() {
         }
 
         if (!currentOrderNo) return;
+
+        // 💡【姓名與 E 欄組合邏輯】如果 E 欄有有效文字且不是 FALSE，則變成 姓名(E欄文字)
+        let contact = "未命名";
+        if (contactRaw && contactRaw.length < 15 && contactRaw !== "FALSE") {
+            contact = contactRaw;
+            if (extraInfo && extraInfo !== "FALSE" && extraInfo !== "" && extraInfo !== "₫") {
+                contact += `(${extraInfo})`;
+            }
+        }
 
         // 嚴格過濾 G 欄與 H 欄，排除下拉選單的 ← 符號
         let logistics = "";
@@ -148,7 +162,7 @@ function processOrders() {
             orders[currentOrderNo] = {
                 date: formattedDate,
                 orderNo: currentOrderNo,
-                contact: contact && contact.length < 15 && contact !== "FALSE" ? contact : "未命名",
+                contact: contact,
                 logistics: logistics || "超商寄送",
                 addressMemo: addressMemo && addressMemo !== "FALSE" && addressMemo !== "₫" ? addressMemo : "無物流碼",
                 memo: foundMemo,
@@ -156,7 +170,9 @@ function processOrders() {
                 items: []
             };
         } else {
-            if (contact && contact.length < 15 && contact !== "FALSE") orders[currentOrderNo].contact = contact;
+            if (contactRaw && contactRaw.length < 15 && contactRaw !== "FALSE") {
+                orders[currentOrderNo].contact = contact;
+            }
             if (logistics && logistics !== "" && logistics !== "←") orders[currentOrderNo].logistics = logistics;
             if (addressMemo && addressMemo !== "FALSE" && addressMemo !== "" && addressMemo !== "←") orders[currentOrderNo].addressMemo = addressMemo;
             if (foundMemo && !orders[currentOrderNo].memo.includes(foundMemo)) {
@@ -191,7 +207,6 @@ function processOrders() {
     for (let key in orders) {
         let ord = orders[key];
 
-        // 💡 粗線改為 12 格 (━━━━━━━━━━━━)
         let mainReceipt = 
 `━━━━━━━━━━━━
 日期：${ord.date}
@@ -262,10 +277,10 @@ function printViaBrowserWindow() {
                 }
                 body { 
                     font-family: monospace; 
-                    font-size: 14px; /* 💡 字體改為 14px */
+                    font-size: 14px; 
                     font-weight: bold;
                     line-height: 1.3; 
-                    /* 💡 總寬度設為 53mm */
+                    /* 💡 總寬度微調改為 53mm */
                     width: 53mm; 
                     max-width: 53mm;
                     margin: 0; 
