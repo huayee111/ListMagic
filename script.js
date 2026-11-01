@@ -208,14 +208,13 @@ function processOrders() {
         let ord = orders[key];
 
         let mainReceipt = 
-`━━━━━━━━━━━━
-日期：${ord.date}
-編號：${ord.orderNo}
+`━━━━━━━━━━━━━
 姓名：${ord.contact}
-━━━━━━━━━━━━
+編號：${ord.orderNo}
+---------------------
 寄送方式：${ord.logistics}
 物流碼：${ord.addressMemo}
----------------------\n`;
+━━━━━━━━━━━━━\n`;
 
         if (ord.items.length > 0) {
             ord.items.forEach(item => {
@@ -234,7 +233,8 @@ function processOrders() {
         mainReceipt += 
 `---------------------
 總金額：$${ord.totalAmount}
-━━━━━━━━━━━━`;
+━━━━━━━━━━━━
+出單日期：${ord.date}`;
 
         generatedReceipts.push({ type: 'main', content: mainReceipt });
         previewHtml += mainReceipt + "\n\n================ [ 主單裁切處 ] ================\n\n";
