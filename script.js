@@ -208,9 +208,8 @@ function processOrders() {
         let ord = orders[key];
 
         let mainReceipt = 
-`━━━━━━━━━━━━━
-姓名：${ord.contact}
-編號：${ord.orderNo}
+`姓名：${ord.contact}
+訂編：${ord.orderNo}
 ---------------------
 寄送方式：${ord.logistics}
 物流碼：${ord.addressMemo}
