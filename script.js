@@ -93,7 +93,6 @@ function processOrders() {
     const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     rows.forEach(row => {
-        // 💡 嚴格對應指定欄位
         let orderNo = row[1] ? row[1].trim() : "";       // B 欄：訂單編號
         let contactRaw = row[3] ? row[3].trim() : "";    // D 欄：聯絡人
         let extraInfo = row[4] ? row[4].trim() : "";     // E 欄：附加資訊
@@ -103,14 +102,12 @@ function processOrders() {
         let quantity = row[9] ? row[9].trim() : "";      // J 欄：數量
         let totalAmount = row[12] ? row[12].trim() : ""; // M 欄：總金額
 
-        // 如果 B 欄有有效的訂單編號，才更新當前訂單
         if (orderNo && orderNo !== "FALSE" && orderNo !== "₫" && orderNo !== "💀") {
             currentOrderNo = orderNo;
         }
 
         if (!currentOrderNo) return;
 
-        // 姓名與 E 欄組合邏輯
         let contact = "未命名";
         if (contactRaw && contactRaw.length < 15 && contactRaw !== "FALSE") {
             contact = contactRaw;
@@ -119,7 +116,6 @@ function processOrders() {
             }
         }
 
-        // 嚴格過濾 G 欄與 H 欄，排除下拉選單的 ← 符號
         let logistics = "";
         if (logisticsRaw && logisticsRaw !== "←" && !logisticsRaw.startsWith("←")) {
             logistics = logisticsRaw;
@@ -132,7 +128,6 @@ function processOrders() {
 
         let foundMemo = "";
 
-        // 1. 檢查 G 欄是否帶有 ➤ 備註
         if (logisticsRaw.includes("➤")) {
             let parts = logisticsRaw.split("➤");
             logistics = parts[0].trim();
@@ -141,7 +136,6 @@ function processOrders() {
             }
         }
 
-        // 2. 檢查 H 欄是否帶有 ➤ 備註
         if (addressMemoRaw.includes("➤")) {
             let parts = addressMemoRaw.split("➤");
             addressMemo = parts[0].trim();
@@ -178,7 +172,6 @@ function processOrders() {
             }
         }
 
-        // 精準鎖定 I 欄商品，保留所有文字，並自動切除後方黏到的長串條碼數字
         if (itemName && itemName !== "FALSE" && itemName !== "₫" && itemName !== "←" && itemName !== "💀" && !itemName.startsWith("←")) {
             let cleanName = itemName;
             let codeMatch = cleanName.match(/^(.*?)(\d{8,})$/);
@@ -213,7 +206,7 @@ function processOrders() {
         if (ord.items.length > 0) {
             ord.items.forEach(item => {
                 let qtyStr = item.qty ? item.qty.trim() : "";
-                let qtyDisplay = qtyStr !== "" ? 【${qtyStr}】 : `➤`;
+                let qtyDisplay = qtyStr !== "" ? `【${qtyStr}】` : `➤`;
                 mainReceipt += `${qtyDisplay}${item.name}\n`;
             });
         } else {
@@ -233,7 +226,6 @@ function processOrders() {
         generatedReceipts.push({ type: 'main', content: mainReceipt });
         previewHtml += mainReceipt + "\n\n================ [ 主單裁切處 ] ================\n\n";
 
-        // 小叮嚀卡片
         let printedKeywords = new Set();
         ord.items.forEach(item => {
             memoRules.forEach(rule => {
