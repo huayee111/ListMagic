@@ -93,31 +93,24 @@ function processOrders() {
     const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     rows.forEach(row => {
-        let orderNo = row[1] ? row[1].trim() : "";       // B 訂單編號
+        // 💡 嚴格對應指定欄位
+        let orderNo = row[1] ? row[1].trim() : "";       // B 欄：訂單編號
         let contactRaw = row[3] ? row[3].trim() : "";    // D 欄：聯絡人
-        let extraInfo = row[4] ? row[4].trim() : "";     // E 欄：附加資訊 (如電話、分機)
+        let extraInfo = row[4] ? row[4].trim() : "";     // E 欄：附加資訊
         let logisticsRaw = row[6] ? row[6].trim() : "";  // G 欄：物流
         let addressMemoRaw = row[7] ? row[7].trim() : "";// H 欄：物流碼
         let itemName = row[8] ? row[8].trim() : "";      // I 欄：商品名稱
         let quantity = row[9] ? row[9].trim() : "";      // J 欄：數量
         let totalAmount = row[12] ? row[12].trim() : ""; // M 欄：總金額
 
-        // 智慧尋找訂單編號
-        row.forEach(cell => {
-            if (cell && /^[0-9A-Z]{10,25}$/.test(cell) && !cell.includes("TW") && !cell.includes("CG01") && !cell.includes("CD01")) {
-                if (cell !== "FALSE" && cell !== "₫" && cell !== "💀") {
-                    orderNo = cell;
-                }
-            }
-        });
-
-        if (orderNo) {
+        // 如果 B 欄有有效的訂單編號，才更新當前訂單
+        if (orderNo && orderNo !== "FALSE" && orderNo !== "₫" && orderNo !== "💀") {
             currentOrderNo = orderNo;
         }
 
         if (!currentOrderNo) return;
 
-        // 💡【姓名與 E 欄組合邏輯】如果 E 欄有有效文字且不是 FALSE，則變成 姓名(E欄文字)
+        // 姓名與 E 欄組合邏輯
         let contact = "未命名";
         if (contactRaw && contactRaw.length < 15 && contactRaw !== "FALSE") {
             contact = contactRaw;
@@ -133,7 +126,7 @@ function processOrders() {
         }
 
         let addressMemo = "";
-        if (addressMemoRaw && addressMemoRaw !== "←" && !addressMemoRaw.startsWith("←")) {
+        if (addressMemoRaw && addressMemoRaw !== "FALSE" && addressMemoRaw !== "₫" && addressMemoRaw !== "←" && !addressMemoRaw.startsWith("←")) {
             addressMemo = addressMemoRaw;
         }
 
@@ -164,7 +157,7 @@ function processOrders() {
                 orderNo: currentOrderNo,
                 contact: contact,
                 logistics: logistics || "超商寄送",
-                addressMemo: addressMemo && addressMemo !== "FALSE" && addressMemo !== "₫" ? addressMemo : "無物流碼",
+                addressMemo: addressMemo || "無物流碼",
                 memo: foundMemo,
                 totalAmount: totalAmount && !isNaN(totalAmount) ? totalAmount : "0",
                 items: []
@@ -174,7 +167,9 @@ function processOrders() {
                 orders[currentOrderNo].contact = contact;
             }
             if (logistics && logistics !== "" && logistics !== "←") orders[currentOrderNo].logistics = logistics;
-            if (addressMemo && addressMemo !== "FALSE" && addressMemo !== "" && addressMemo !== "←") orders[currentOrderNo].addressMemo = addressMemo;
+            if (addressMemo && addressMemo !== "FALSE" && addressMemo !== "" && addressMemo !== "←") {
+                orders[currentOrderNo].addressMemo = addressMemo;
+            }
             if (foundMemo && !orders[currentOrderNo].memo.includes(foundMemo)) {
                 orders[currentOrderNo].memo = orders[currentOrderNo].memo ? orders[currentOrderNo].memo + " " + foundMemo : foundMemo;
             }
@@ -218,7 +213,7 @@ function processOrders() {
         if (ord.items.length > 0) {
             ord.items.forEach(item => {
                 let qtyStr = item.qty ? item.qty.trim() : "";
-                let qtyDisplay = qtyStr !== "" ? `【${qtyStr}】` : `➤`;
+                let qtyDisplay = qtyStr !== "" ? 【${qtyStr}】 : `➤`;
                 mainReceipt += `${qtyDisplay}${item.name}\n`;
             });
         } else {
@@ -279,7 +274,6 @@ function printViaBrowserWindow() {
                     font-size: 14px; 
                     font-weight: bold;
                     line-height: 1.3; 
-                    /* 💡 總寬度微調改為 53mm */
                     width: 53mm; 
                     max-width: 53mm;
                     margin: 0; 
