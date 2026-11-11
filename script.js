@@ -220,7 +220,7 @@ function processOrders() {
         let ord = orders[key];
 
         let mainReceipt = 
-`━━━━━━━━━━━━━\n
+`━━━━━━━━━━━━━
 姓名：${ord.contact}
 訂編：${ord.orderNo}
 ---------------------
