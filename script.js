@@ -61,15 +61,37 @@ function processOrders() {
     }
 
     let textValue = rawText.value;
+
+    // 💡 預處理防護 1：把所有被雙引號包覆的欄位內部的換行符號轉成空白，防止試算表內部換行打斷結構
     textValue = textValue.replace(/"([^"]*?)"/g, (match, p1) => {
         return '"' + p1.replace(/[\r\n]+/g, ' ') + '"';
     });
 
     const rawLines = textValue.split('\n');
+    let cleanedLines = [];
+
+    // 💡 預處理防護 2：全面欄位智慧黏合。只要某行沒有 Tab 且沒有訂單編號特徵，就無條件視為上方欄位按到換行的殘留文字並自動黏合
+    rawLines.forEach(line => {
+        let trimmed = line.trim();
+        // 檢查該行是否包含 Tab (標準表格) 或是開頭看起來像日期/平台名稱/或是包含長編號特徵
+        let isNewRow = line.includes('\t') || /^\d{1,2}\/\d{1,2}$/.test(trimmed) || /^[0-9A-Z]{10,25}$/.test(trimmed);
+
+        if (isNewRow || trimmed === "") {
+            cleanedLines.push(line);
+        } else {
+            // 如果不符合新列特徵，代表它是任意欄位不小心被換行切斷的殘留文字，無條件黏回上一行結尾
+            if (cleanedLines.length > 0) {
+                cleanedLines[cleanedLines.length - 1] += " " + trimmed;
+            } else {
+                cleanedLines.push(line);
+            }
+        }
+    });
+
     let rows = [];
     let currentRow = [];
 
-    rawLines.forEach(line => {
+    cleanedLines.forEach(line => {
         let trimmed = line.trim();
         if (line.includes('\t')) {
             if (currentRow.length > 0) {
@@ -93,6 +115,7 @@ function processOrders() {
     const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     rows.forEach(row => {
+        // 💡 嚴格對應指定欄位
         let orderNo = row[1] ? row[1].trim() : "";       // B 欄：訂單編號
         let contactRaw = row[3] ? row[3].trim() : "";    // D 欄：聯絡人
         let extraInfo = row[4] ? row[4].trim() : "";     // E 欄：附加資訊
@@ -108,6 +131,7 @@ function processOrders() {
 
         if (!currentOrderNo) return;
 
+        // 姓名與 E 欄組合邏輯
         let contact = "未命名";
         if (contactRaw && contactRaw.length < 15 && contactRaw !== "FALSE") {
             contact = contactRaw;
@@ -196,7 +220,8 @@ function processOrders() {
         let ord = orders[key];
 
         let mainReceipt = 
-`姓名：${ord.contact}
+`━━━━━━━━━━━━━\n
+姓名：${ord.contact}
 訂編：${ord.orderNo}
 ---------------------
 寄送方式：${ord.logistics}
