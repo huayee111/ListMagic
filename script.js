@@ -223,7 +223,7 @@ function processOrders() {
 `━━━━━━━━━━━━━
 姓名：${ord.contact}
 訂編：${ord.orderNo}
----------------------
+-----------------------
 寄送方式：${ord.logistics}
 物流碼：${ord.addressMemo}
 ━━━━━━━━━━━━━\n`;
@@ -243,9 +243,9 @@ function processOrders() {
         }
 
         mainReceipt += 
-`---------------------
+`-----------------------
 總金額：$${ord.totalAmount}
-━━━━━━━━━━━━
+━━━━━━━━━━━━━
 出單日期：${ord.date}`;
 
         generatedReceipts.push({ type: 'main', content: mainReceipt });
